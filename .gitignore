@@ -1,0 +1,6 @@
+/outputs
+__pycache__/
+*.weights
+/data/video
+/checkpoints/yolov4-416/
+/checkpoints/yolov4-tiny-416/
