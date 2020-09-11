@@ -1,22 +1,19 @@
 import os
+from datetime import datetime
 
-# comment out below line to enable tensorflow logging outputs
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import time
 import tensorflow as tf
-import sched, time
-import subprocess
+import time
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
-from absl import app, flags, logging
+from absl import app, flags
 from absl.flags import FLAGS
 import core.utils as utils
 from core.yolov4 import filter_boxes
 from tensorflow.python.saved_model import tag_constants
 from core.config import cfg
-import tkinter as tk
 from PIL import Image
 import cv2
 import numpy as np
@@ -32,8 +29,6 @@ from deep_sort.tracker import Tracker
 from tools import generate_detections as gdet
 
 # timer
-from twisted.internet import task
-from twisted.internet import reactor
 
 flags.DEFINE_string('framework', 'tf', '(tf, tflite, trt')
 flags.DEFINE_string('weights', './checkpoints/yolov4-416',
@@ -50,12 +45,14 @@ flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
 flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
 
-max_person_counter = 0
+DETECTION_EVENTS = []
+MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 2
+MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
 
 
 def main(_argv):
     # Definition of the parameters
-    global max_person_counter
+    global MAXIMUM_NUMBER_OF_PEOPLE_DETECTED
     max_cosine_distance = 0.4
     nn_budget = None
     nms_max_overlap = 1.0
@@ -238,11 +235,12 @@ def main(_argv):
             cv2.putText(frame, "#" + str(track.track_id), (int(bbox[0]), int(bbox[1] - 10)), 0, 0.75, (255, 255, 255),
                         2)
             font = cv2.FONT_HERSHEY_COMPLEX
-            if max_person_counter < track.track_id:
-                if max_person_counter == 0:
-                    timer_with_person = time.time()
-                max_person_counter = track.track_id
-            cv2.putText(frame, "Personas detectadas: " + str(max_person_counter), (20, 25), font, 1, (0, 0, 0), 2,
+            if MAXIMUM_NUMBER_OF_PEOPLE_DETECTED < track.track_id:
+                MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = track.track_id
+                DETECTION_EVENTS.append({"number_of_people_detected": track.track_id,
+                                         "datetime_event": datetime.now()})
+            cv2.putText(frame, "Personas detectadas: " + str(MAXIMUM_NUMBER_OF_PEOPLE_DETECTED), (20, 25), font, 1,
+                        (0, 0, 0), 2,
                         cv2.LINE_AA)
 
         # if enable info flag then print details about each track
@@ -262,9 +260,28 @@ def main(_argv):
             out.write(result)
         if cv2.waitKey(1) & 0xFF == ord('q'): break
 
-        print("something")
+        if DETECTION_EVENTS:
+            print("DETECTO ALGO")
+            waiting_time_in_seconds = calculate_average_waiting_time_in_seconds()
+            last_number_of_people_detected = get_last_number_of_people_detected()
+            average_waiting_time_in_seconds = waiting_time_in_seconds / last_number_of_people_detected
+            print("AVG: {}".format(average_waiting_time_in_seconds))
+            if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS:
+                print("HOLA!")
 
     cv2.destroyAllWindows()
+
+
+def get_last_number_of_people_detected():
+    return DETECTION_EVENTS[-1]['number_of_people_detected']
+
+
+def calculate_average_waiting_time_in_seconds():
+    datetime_diff_in_seconds = []
+    for oldest_event, newest_event in zip(DETECTION_EVENTS, DETECTION_EVENTS[1:]):
+        diff = oldest_event['datetime_event'] - newest_event['datetime_event']
+        datetime_diff_in_seconds.append(abs(diff.total_seconds()))
+    return sum(datetime_diff_in_seconds)
 
 
 if __name__ == '__main__':
