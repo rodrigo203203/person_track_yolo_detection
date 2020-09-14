@@ -48,7 +48,7 @@ flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
 DETECTION_EVENTS = []
 MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 2
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
-
+MAX_VALUE_FOR_CLOSED_PERSON = 650
 
 def main(_argv):
     # Definition of the parameters
@@ -238,7 +238,8 @@ def main(_argv):
             if MAXIMUM_NUMBER_OF_PEOPLE_DETECTED < track.track_id:
                 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = track.track_id
                 DETECTION_EVENTS.append({"number_of_people_detected": track.track_id,
-                                         "datetime_event": datetime.now()})
+                                         "datetime_event": datetime.now(),"detection_position": bbox[-1]})
+                print(DETECTION_EVENTS)
             cv2.putText(frame, "Personas detectadas: " + str(MAXIMUM_NUMBER_OF_PEOPLE_DETECTED), (20, 25), font, 1,
                         (0, 0, 0), 2,
                         cv2.LINE_AA)
@@ -246,7 +247,7 @@ def main(_argv):
         # if enable info flag then print details about each track
 
         # calculate frames per second of running detections
-        # cv2.line(frame,(0,500),(1300,500),(255,0,0),4)
+        cv2.line(frame,(0,650),(1300,650),(255,0,0),4)
         fps = 1.0 / (time.time() - start_time)
         print("FPS: %.2f" % fps)
         result = np.asarray(frame)
@@ -268,6 +269,10 @@ def main(_argv):
             print("AVG: {}".format(average_waiting_time_in_seconds))
             if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS:
                 print("HOLA!")
+        if DETECTION_EVENTS:
+            print("NUMERO MAXIMO")
+            person_closed = create_list_of_closest_person_detected()
+            print(person_closed)
 
     cv2.destroyAllWindows()
 
@@ -275,7 +280,13 @@ def main(_argv):
 def get_last_number_of_people_detected():
     return DETECTION_EVENTS[-1]['number_of_people_detected']
 
-
+def create_list_of_closest_person_detected():
+    list_closest_person_detected = []
+    for closest_detectton in DETECTION_EVENTS:
+        closest_detectton = DETECTION_EVENTS[0].get('detecction_position',0)
+        list_closest_person_detected.append(closest_detectton)
+        print(closest_detectton)
+    return max(list_closest_person_detected)
 def calculate_average_waiting_time_in_seconds():
     datetime_diff_in_seconds = []
     for oldest_event, newest_event in zip(DETECTION_EVENTS, DETECTION_EVENTS[1:]):
