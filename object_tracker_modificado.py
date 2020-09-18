@@ -4,7 +4,8 @@ from datetime import datetime
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import time
-
+import subprocess
+from time import sleep
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -26,6 +27,7 @@ from tensorflow.compat.v1 import InteractiveSession
 from deep_sort import preprocessing, nn_matching
 from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
+from deep_sort import track
 from tools import generate_detections as gdet
 
 # timer
@@ -39,7 +41,7 @@ flags.DEFINE_string('model', 'yolov4', 'yolov3 or yolov4')
 flags.DEFINE_string('video', './data/video/test.mp4', 'path to input video or set to 0 for webcam')
 flags.DEFINE_string('output', None, 'path to output video')
 flags.DEFINE_string('output_format', 'XVID', 'codec used in VideoWriter when saving video to file')
-flags.DEFINE_float('iou', 0.2, 'iou threshold')
+flags.DEFINE_float('iou', 0.45, 'iou threshold')
 flags.DEFINE_float('score', 0.50, 'score threshold')
 flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
@@ -48,8 +50,7 @@ flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
 DETECTION_EVENTS = []
 MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 2
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
-MAX_VALUE_FOR_CLOSED_PERSON = 650
-
+MAX_VALUE_FOR_CLOSED_PERSON = 400
 def main(_argv):
     # Definition of the parameters
     global MAXIMUM_NUMBER_OF_PEOPLE_DETECTED
@@ -105,9 +106,6 @@ def main(_argv):
         out = cv2.VideoWriter(FLAGS.output, codec, fps, (width, height))
 
     # ciclo al comenzar el programa
-    # subprocess.Popen(
-    # "python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py",
-    # shell=True)
     while True:
         return_value, frame = vid.read()
         if return_value:
@@ -132,10 +130,10 @@ def main(_argv):
             pred = [interpreter.get_tensor(output_details[i]['index']) for i in range(len(output_details))]
             # run detections using yolov3 if flag is set
             if FLAGS.model == 'yolov3' and FLAGS.tiny == True:
-                boxes, pred_conf = filter_boxes(pred[1], pred[0], score_threshold=0.2,
+                boxes, pred_conf = filter_boxes(pred[1], pred[0], score_threshold=0.25,
                                                 input_shape=tf.constant([input_size, input_size]))
             else:
-                boxes, pred_conf = filter_boxes(pred[0], pred[1], score_threshold=0.2,
+                boxes, pred_conf = filter_boxes(pred[0], pred[1], score_threshold=0.25,
                                                 input_shape=tf.constant([input_size, input_size]))
         else:
 
@@ -170,15 +168,14 @@ def main(_argv):
 
         # store all predictions in one parameter for simplicity when calling functions
         pred_bbox = [bboxes, scores, classes, num_objects]
-
         # read in all class names from config
         class_names = utils.read_class_names(cfg.YOLO.CLASSES)
 
         # by default allow all classes in .names file
-        # allowed_classes = list(class_names.values())
-
+        #allowed_classes = list(class_names.values())
+        #print(allowed_classes)
         # Se elige que clases se va a detectar
-        allowed_classes = ['person']
+        allowed_classes = ['car']
 
         # se inicia el filtro para separar las clases a detectar
         names = []
@@ -214,40 +211,46 @@ def main(_argv):
         classes = np.array([d.class_name for d in detections])
         indices = preprocessing.non_max_suppression(boxs, classes, nms_max_overlap, scores)
         detections = [detections[i] for i in indices]
-
         # Call the tracker
         tracker.predict()
         tracker.update(detections)
 
         # update tracks
+
         for track in tracker.tracks:
+
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
             bbox = track.to_tlbr()
-            class_name = track.get_class()
+            print(bbox[-1])
+            if bbox[-1] > MAX_VALUE_FOR_CLOSED_PERSON:
+                track.is_deleted()
+                continue
 
-            # draw bbox on screen
+            #max_close = create_list_of_closest_person_detected()
+            #print("max",max_close)
+            class_name = track.get_class()
+                # draw bbox on screen
             color = colors[int(track.track_id) % len(colors)]
             color = [i * 255 for i in color]
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1] - 30)),
                           (int(bbox[0]) + (len(class_name) + len(str(track.track_id))) * 17, int(bbox[1])), color, -1)
-            cv2.putText(frame, "#" + str(track.track_id), (int(bbox[0]), int(bbox[1] - 10)), 0, 0.75, (255, 255, 255),
-                        2)
+            cv2.putText(frame, "#" + str(track.track_id), (int(bbox[0]), int(bbox[1] - 10)), 0, 0.75, (255, 255, 255),2)
             font = cv2.FONT_HERSHEY_COMPLEX
             if MAXIMUM_NUMBER_OF_PEOPLE_DETECTED < track.track_id:
-                MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = track.track_id
-                DETECTION_EVENTS.append({"number_of_people_detected": track.track_id,
-                                         "datetime_event": datetime.now(),"detection_position": bbox[-1]})
-                print(DETECTION_EVENTS)
+                    MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = track.track_id
+                    DETECTION_EVENTS.append({"number_of_people_detected": track.track_id,
+                                             "datetime_event": datetime.now(),"detection_position": bbox[-1]})
             cv2.putText(frame, "Personas detectadas: " + str(MAXIMUM_NUMBER_OF_PEOPLE_DETECTED), (20, 25), font, 1,
-                        (0, 0, 0), 2,
-                        cv2.LINE_AA)
+                            (0, 0, 0), 2,cv2.LINE_AA)
+        else:
+             print("no hay nada")
 
-        # if enable info flag then print details about each track
-
+        #if enable info flag then print details about each track
         # calculate frames per second of running detections
-        cv2.line(frame,(0,650),(1300,650),(255,0,0),4)
+        cv2.line(frame,(0,400),(1300,400),(255,0,0),4)
+        #cv2.line(frame, (650, 0), (650, 1350), (255, 0, 0), 4)
         fps = 1.0 / (time.time() - start_time)
         print("FPS: %.2f" % fps)
         result = np.asarray(frame)
@@ -262,17 +265,16 @@ def main(_argv):
         if cv2.waitKey(1) & 0xFF == ord('q'): break
 
         if DETECTION_EVENTS:
-            print("DETECTO ALGO")
             waiting_time_in_seconds = calculate_average_waiting_time_in_seconds()
             last_number_of_people_detected = get_last_number_of_people_detected()
             average_waiting_time_in_seconds = waiting_time_in_seconds / last_number_of_people_detected
             print("AVG: {}".format(average_waiting_time_in_seconds))
             if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS:
                 print("HOLA!")
-        if DETECTION_EVENTS:
-            print("NUMERO MAXIMO")
-            person_closed = create_list_of_closest_person_detected()
-            print(person_closed)
+                #subprocess.run('python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
+                 #              shell=True)
+                #sleep(30)
+
 
     cv2.destroyAllWindows()
 
@@ -281,19 +283,29 @@ def get_last_number_of_people_detected():
     return DETECTION_EVENTS[-1]['number_of_people_detected']
 
 def create_list_of_closest_person_detected():
-    list_closest_person_detected = []
-    for closest_detectton in DETECTION_EVENTS:
-        closest_detectton = DETECTION_EVENTS[0].get('detecction_position',0)
-        list_closest_person_detected.append(closest_detectton)
-        print(closest_detectton)
-    return max(list_closest_person_detected)
+    list_closest_person_detected = [0,0]
+    for closest_detecttion in DETECTION_EVENTS:
+        person_closes = closest_detecttion[0]['detection_position',0]
+        list_closest_person_detected.append(person_closes)
+        max_value = np.max(list_closest_person_detected)
+    return max_value
 def calculate_average_waiting_time_in_seconds():
     datetime_diff_in_seconds = []
     for oldest_event, newest_event in zip(DETECTION_EVENTS, DETECTION_EVENTS[1:]):
         diff = oldest_event['datetime_event'] - newest_event['datetime_event']
         datetime_diff_in_seconds.append(abs(diff.total_seconds()))
     return sum(datetime_diff_in_seconds)
+def Popup():
+    popup = tk.Tk()
+    canvas = tk.Canvas(popup, height=400, width=600, bg="#263d42")
+    canvas.pack()
+    frame2 = tk.Frame(popup, bg="white")
+    frame2.place(relwidth=0.8, relheight=0.8, relx=0.1, rely=0.1)
+    popup.title("EMERGENCIA")
+    b1 = tk.Button(popup, text="Okay", padx=10, pady=5, fg="gray", bg="#263d42", command=popup.destroy())
+    b1.pack()
 
+    popup.mainloop()
 
 if __name__ == '__main__':
     try:
