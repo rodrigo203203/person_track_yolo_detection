@@ -24,10 +24,11 @@ from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
 
 # deep sort imports
-from deep_sort import preprocessing, nn_matching
+from deep_sort import preprocessing, nn_matching, linear_assignment
 from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
 from deep_sort import track
+#from deep_sort import linear_assignment
 from tools import generate_detections as gdet
 
 # timer
@@ -50,7 +51,8 @@ flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
 DETECTION_EVENTS = []
 MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 2
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
-MAX_VALUE_FOR_CLOSED_PERSON = 400
+MAX_VALUE_FOR_CLOSED_PERSON = 1900
+MAXIMUM_TIME_WAITING_IN_SECONDS = 30
 def main(_argv):
     # Definition of the parameters
     global MAXIMUM_NUMBER_OF_PEOPLE_DETECTED
@@ -222,9 +224,10 @@ def main(_argv):
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
             bbox = track.to_tlbr()
-            print(bbox[-1])
+            #print(bbox[-1])
             if bbox[-1] > MAX_VALUE_FOR_CLOSED_PERSON:
                 track.is_deleted()
+                DETECTION_EVENTS = []
                 continue
 
             #max_close = create_list_of_closest_person_detected()
@@ -269,7 +272,9 @@ def main(_argv):
             last_number_of_people_detected = get_last_number_of_people_detected()
             average_waiting_time_in_seconds = waiting_time_in_seconds / last_number_of_people_detected
             print("AVG: {}".format(average_waiting_time_in_seconds))
-            if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS:
+            diff2 = DETECTION_EVENTS[0]["datetime_event"] - datetime.now()
+            max_time = abs(diff2.total_seconds())
+            if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS or max_time >= MAXIMUM_TIME_WAITING_IN_SECONDS:
                 print("HOLA!")
                 #subprocess.run('python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
                  #              shell=True)

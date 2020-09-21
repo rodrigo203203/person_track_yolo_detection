@@ -8,9 +8,12 @@ from . import kalman_filter
 INFTY_COST = 1e+5
 
 
+global list_of_tracks
+list_of_tracks = []
 def min_cost_matching(
         distance_metric, max_distance, tracks, detections, track_indices=None,
         detection_indices=None):
+
     """Solve linear assignment problem.
 
     Parameters
@@ -73,6 +76,7 @@ def min_cost_matching(
             unmatched_detections.append(detection_idx)
         else:
             matches.append((track_idx, detection_idx))
+    list_of_tracks = tracks
     return matches, unmatched_tracks, unmatched_detections
 
 
