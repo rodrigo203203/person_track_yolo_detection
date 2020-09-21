@@ -46,16 +46,18 @@ flags.DEFINE_float('iou', 0.45, 'iou threshold')
 flags.DEFINE_float('score', 0.50, 'score threshold')
 flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
-flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
+#flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
 
 DETECTION_EVENTS = []
 MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 2
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
-MAX_VALUE_FOR_CLOSED_PERSON = 1900
+MAX_VALUE_FOR_CLOSED_PERSON = 400
 MAXIMUM_TIME_WAITING_IN_SECONDS = 30
+COUNTER_OF_PEOPLE_DETECTED = 0
 def main(_argv):
     # Definition of the parameters
     global MAXIMUM_NUMBER_OF_PEOPLE_DETECTED
+    global COUNTER_OF_PEOPLE_DETECTED
     max_cosine_distance = 0.4
     nn_budget = None
     nms_max_overlap = 1.0
@@ -191,10 +193,10 @@ def main(_argv):
                 names.append(class_name)
         names = np.array(names)
         count = len(names)
-        if FLAGS.count:
-            cv2.putText(frame, "Objects being tracked: {}".format(count), (5, 35), cv2.FONT_HERSHEY_SCRIPT_COMPLEX, 2,
-                        (0, 255, 0), 2)
-            print("Objects being tracked: {}".format(count))
+        #if FLAGS.count:
+         #   cv2.putText(frame, "Objects being tracked: {}".format(count), (5, 35), cv2.FONT_HERSHEY_SCRIPT_COMPLEX, 2,
+          #              (0, 255, 0), 2)
+           # print("Objects being tracked: {}".format(count))
         # delete detections that are not in allowed_classes
         bboxes = np.delete(bboxes, deleted_indx, axis=0)
         scores = np.delete(scores, deleted_indx, axis=0)
@@ -227,26 +229,21 @@ def main(_argv):
             #print(bbox[-1])
             if bbox[-1] > MAX_VALUE_FOR_CLOSED_PERSON:
                 track.is_deleted()
-                DETECTION_EVENTS = []
+                COUNTER_OF_PEOPLE_DETECTED = 0
+                MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
                 continue
-
-            #max_close = create_list_of_closest_person_detected()
-            #print("max",max_close)
             class_name = track.get_class()
-                # draw bbox on screen
+                # se empieza a dibujar los cuadros
             color = colors[int(track.track_id) % len(colors)]
             color = [i * 255 for i in color]
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
-            cv2.rectangle(frame, (int(bbox[0]), int(bbox[1] - 30)),
-                          (int(bbox[0]) + (len(class_name) + len(str(track.track_id))) * 17, int(bbox[1])), color, -1)
-            cv2.putText(frame, "#" + str(track.track_id), (int(bbox[0]), int(bbox[1] - 10)), 0, 0.75, (255, 255, 255),2)
             font = cv2.FONT_HERSHEY_COMPLEX
             if MAXIMUM_NUMBER_OF_PEOPLE_DETECTED < track.track_id:
-                    MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = track.track_id
+                    MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = MAXIMUM_NUMBER_OF_PEOPLE_DETECTED + 1
                     DETECTION_EVENTS.append({"number_of_people_detected": track.track_id,
                                              "datetime_event": datetime.now(),"detection_position": bbox[-1]})
-            cv2.putText(frame, "Personas detectadas: " + str(MAXIMUM_NUMBER_OF_PEOPLE_DETECTED), (20, 25), font, 1,
-                            (0, 0, 0), 2,cv2.LINE_AA)
+            cv2.putText(frame, "Personas detectadas: {}".format(count), (5, 35), cv2.FONT_HERSHEY_TRIPLEX,1,(255, 0, 0), 2)
+            print("Cantidad de personas detectadas: {}".format(count))
         else:
              print("no hay nada")
 
