@@ -1,16 +1,18 @@
 import tkinter as tk
-from tkinter import filedialog, Text
-import os
-def reset_all():
-    popup.destroy()
-popup = tk.Tk()
-canvas = tk.Canvas(popup,height=400, width= 600, bg="#263d42")
-canvas.pack()
-frame = tk.Frame(popup,bg="white")
-frame.place(relwidth=0.8,relheight=0.8,relx=0.1,rely=0.1)
-popup.title("EMERGENCIA")
+from sys import exit
 
-b1 = tk.Button(popup, text="Okay", padx=10, pady=5, fg="gray", bg="#263d42", command=reset_all)
-b1.pack()
 
-popup.mainloop()
+def show_notification_message(message):
+    popupRoot = tk.Tk()
+    popupRoot.configure(bg='gray')
+    image = "/Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/data/danger.gif"
+    photo = tk.PhotoImage(file=image)
+    label = tk.Label(image=photo)
+    label.pack()
+    popupRoot.after(5000, exit)
+    popupRoot.title("EMERGENCIA")
+    popupButton = tk.Button(popupRoot, text=message, font=("Verdana", 12), bg="yellow", command=exit, wraplength=390)
+    popupButton.pack()
+    popupRoot.geometry('400x200+700+500')
+    popupRoot.mainloop()
+show_notification_message("Se supero el tiempo de espera maximo y se recomienda abrira una nueva caja")

@@ -1,11 +1,10 @@
 import os
+import subprocess
 from datetime import datetime
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import time
-import subprocess
-from time import sleep
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -28,10 +27,8 @@ from deep_sort import preprocessing, nn_matching, linear_assignment
 from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
 from deep_sort import track
-#from deep_sort import linear_assignment
+# from deep_sort import linear_assignment
 from tools import generate_detections as gdet
-
-# timer
 
 flags.DEFINE_string('framework', 'tf', '(tf, tflite, trt')
 flags.DEFINE_string('weights', './checkpoints/yolov4-416',
@@ -46,16 +43,17 @@ flags.DEFINE_float('iou', 0.45, 'iou threshold')
 flags.DEFINE_float('score', 0.50, 'score threshold')
 flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
-#flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
 
 DETECTION_EVENTS = []
 MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 2
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
-MAX_VALUE_FOR_CLOSED_PERSON = 400
-MAXIMUM_TIME_WAITING_IN_SECONDS = 30
-COUNTER_OF_PEOPLE_DETECTED = 0
+MAXIMUM_TIME_WAITING_IN_SECONDS = 10
+LIMIT_LINE_OF_DETECTION = 400
+
+
+
 def main(_argv):
-    # Definition of the parameters
+    # se definen parametros
     global MAXIMUM_NUMBER_OF_PEOPLE_DETECTED
     global COUNTER_OF_PEOPLE_DETECTED
     max_cosine_distance = 0.4
@@ -63,7 +61,7 @@ def main(_argv):
     nms_max_overlap = 1.0
     t = time.time()
 
-    # initialize deep sort
+    # inilizacion de deep sort
     model_filename = 'model_data/mars-small128.pb'
     encoder = gdet.create_box_encoder(model_filename, batch_size=1)
     # calculate cosine distance metric
@@ -71,7 +69,7 @@ def main(_argv):
     # initialize tracker
     tracker = Tracker(metric)
 
-    # load configuration for object detector
+    # configuracion para la deteccion
     config = ConfigProto()
     config.gpu_options.allow_growth = True
     session = InteractiveSession(config=config)
@@ -79,7 +77,7 @@ def main(_argv):
     input_size = FLAGS.size
     video_path = FLAGS.video
 
-    # load tflite model if flag is set
+    # cargar el modelo tyny
     if FLAGS.framework == 'tflite':
         interpreter = tf.lite.Interpreter(model_path=FLAGS.weights)
         interpreter.allocate_tensors()
@@ -87,12 +85,12 @@ def main(_argv):
         output_details = interpreter.get_output_details()
         print(input_details)
         print(output_details)
-    # otherwise load standard tensorflow saved model
+    # carga el modelo yolo normal
     else:
         saved_model_loaded = tf.saved_model.load(FLAGS.weights, tags=[tag_constants.SERVING])
         infer = saved_model_loaded.signatures['serving_default']
 
-    # begin video capture
+    # comienza la carga del video/camara
     try:
         vid = cv2.VideoCapture(int(video_path))
     except:
@@ -100,7 +98,7 @@ def main(_argv):
 
     out = None
 
-    # get video ready to save locally if flag is set
+    # parametro para guardar el video
     if FLAGS.output:
         # by default VideoCapture returns float instead of int
         width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -127,7 +125,7 @@ def main(_argv):
         begin = time.time()
         limit = begin + 20
 
-        # run detections on tflite if flag is set
+        # se inicia la deteccion
         if FLAGS.framework == 'tflite':
             interpreter.set_tensor(input_details[0]['index'], image_data)
             interpreter.invoke()
@@ -176,8 +174,8 @@ def main(_argv):
         class_names = utils.read_class_names(cfg.YOLO.CLASSES)
 
         # by default allow all classes in .names file
-        #allowed_classes = list(class_names.values())
-        #print(allowed_classes)
+        # allowed_classes = list(class_names.values())
+        # print(allowed_classes)
         # Se elige que clases se va a detectar
         allowed_classes = ['car']
 
@@ -193,10 +191,6 @@ def main(_argv):
                 names.append(class_name)
         names = np.array(names)
         count = len(names)
-        #if FLAGS.count:
-         #   cv2.putText(frame, "Objects being tracked: {}".format(count), (5, 35), cv2.FONT_HERSHEY_SCRIPT_COMPLEX, 2,
-          #              (0, 255, 0), 2)
-           # print("Objects being tracked: {}".format(count))
         # delete detections that are not in allowed_classes
         bboxes = np.delete(bboxes, deleted_indx, axis=0)
         scores = np.delete(scores, deleted_indx, axis=0)
@@ -226,31 +220,31 @@ def main(_argv):
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
             bbox = track.to_tlbr()
-            #print(bbox[-1])
-            if bbox[-1] > MAX_VALUE_FOR_CLOSED_PERSON:
+            # print(bbox[-1])
+            if bbox[-1] > LIMIT_LINE_OF_DETECTION:
                 track.is_deleted()
-                COUNTER_OF_PEOPLE_DETECTED = 0
-                MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
+                DETECTION_EVENTS.clear()
                 continue
             class_name = track.get_class()
-                # se empieza a dibujar los cuadros
+            # se empieza a dibujar los cuadros
             color = colors[int(track.track_id) % len(colors)]
             color = [i * 255 for i in color]
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
             font = cv2.FONT_HERSHEY_COMPLEX
             if MAXIMUM_NUMBER_OF_PEOPLE_DETECTED < track.track_id:
-                    MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = MAXIMUM_NUMBER_OF_PEOPLE_DETECTED + 1
-                    DETECTION_EVENTS.append({"number_of_people_detected": track.track_id,
-                                             "datetime_event": datetime.now(),"detection_position": bbox[-1]})
-            cv2.putText(frame, "Personas detectadas: {}".format(count), (5, 35), cv2.FONT_HERSHEY_TRIPLEX,1,(255, 0, 0), 2)
-            print("Cantidad de personas detectadas: {}".format(count))
+                MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = MAXIMUM_NUMBER_OF_PEOPLE_DETECTED + 1
+                DETECTION_EVENTS.append({"number_of_people_detected": track.track_id,
+                                         "datetime_event": datetime.now(), "detection_position": bbox[-1]})
+            cv2.putText(frame, "Personas detectadas: {}".format(count), (5, 35), cv2.FONT_HERSHEY_TRIPLEX, 1,
+                        (255, 0, 0), 2)
         else:
-             print("no hay nada")
+            print("no hay nada")
 
-        #if enable info flag then print details about each track
+        # if enable info flag then print details about each track
         # calculate frames per second of running detections
-        cv2.line(frame,(0,400),(1300,400),(255,0,0),4)
-        #cv2.line(frame, (650, 0), (650, 1350), (255, 0, 0), 4)
+        cv2.line(frame, (0, LIMIT_LINE_OF_DETECTION),
+                        (1300, LIMIT_LINE_OF_DETECTION),
+                        (255, 0, 0), 4)
         fps = 1.0 / (time.time() - start_time)
         print("FPS: %.2f" % fps)
         result = np.asarray(frame)
@@ -273,10 +267,13 @@ def main(_argv):
             max_time = abs(diff2.total_seconds())
             if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS or max_time >= MAXIMUM_TIME_WAITING_IN_SECONDS:
                 print("HOLA!")
-                #subprocess.run('python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
-                 #              shell=True)
-                #sleep(30)
+                max_time = 0
+                # while len(DETECTION_EVENTS) > 0: DETECTION_EVENTS.pop()
+                # show_notification_message("message")
 
+                subprocess.run('python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
+                          shell=True)
+            # sleep(30)
 
     cv2.destroyAllWindows()
 
@@ -284,30 +281,23 @@ def main(_argv):
 def get_last_number_of_people_detected():
     return DETECTION_EVENTS[-1]['number_of_people_detected']
 
+
 def create_list_of_closest_person_detected():
-    list_closest_person_detected = [0,0]
+    list_closest_person_detected = [0, 0]
     for closest_detecttion in DETECTION_EVENTS:
-        person_closes = closest_detecttion[0]['detection_position',0]
+        person_closes = closest_detecttion[0]['detection_position', 0]
         list_closest_person_detected.append(person_closes)
         max_value = np.max(list_closest_person_detected)
     return max_value
+
+
 def calculate_average_waiting_time_in_seconds():
     datetime_diff_in_seconds = []
     for oldest_event, newest_event in zip(DETECTION_EVENTS, DETECTION_EVENTS[1:]):
         diff = oldest_event['datetime_event'] - newest_event['datetime_event']
         datetime_diff_in_seconds.append(abs(diff.total_seconds()))
     return sum(datetime_diff_in_seconds)
-def Popup():
-    popup = tk.Tk()
-    canvas = tk.Canvas(popup, height=400, width=600, bg="#263d42")
-    canvas.pack()
-    frame2 = tk.Frame(popup, bg="white")
-    frame2.place(relwidth=0.8, relheight=0.8, relx=0.1, rely=0.1)
-    popup.title("EMERGENCIA")
-    b1 = tk.Button(popup, text="Okay", padx=10, pady=5, fg="gray", bg="#263d42", command=popup.destroy())
-    b1.pack()
 
-    popup.mainloop()
 
 if __name__ == '__main__':
     try:
