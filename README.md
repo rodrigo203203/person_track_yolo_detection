@@ -1,4 +1,4 @@
-# yolov4-deepsort para la deteccion de personas y mejorar las filas de los supermercados
+# yolov4 + deepsort para la deteccion de personas y mejorar las filas de los supermercados
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](LICENSE)
 
 ## Comandos para el codigo
@@ -50,4 +50,5 @@ save_model.py:
    Huge shoutout goes to hunglc007 and nwojke for creating the backbones of this repository:
   * [tensorflow-yolov4-tflite](https://github.com/hunglc007/tensorflow-yolov4-tflite)
   * [Deep SORT Repository](https://github.com/nwojke/deep_sort)
+  * [The AI GUY](https://github.com/theAIGuysCode/yolov4-deepsort)
 # person_track_yolo_detection
