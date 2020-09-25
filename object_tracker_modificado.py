@@ -164,18 +164,14 @@ def main(_argv):
         classes = classes.numpy()[0]
         classes = classes[0:int(num_objects)]
 
-        # format bounding boxes from normalized ymin, xmin, ymax, xmax ---> xmin, ymin, width, height
         original_h, original_w, _ = frame.shape
         bboxes = utils.format_boxes(bboxes, original_h, original_w)
-
-        # store all predictions in one parameter for simplicity when calling functions
         pred_bbox = [bboxes, scores, classes, num_objects]
         # read in all class names from config
         class_names = utils.read_class_names(cfg.YOLO.CLASSES)
 
-        # by default allow all classes in .names file
+        # Activar todas las clases
         # allowed_classes = list(class_names.values())
-        # print(allowed_classes)
         # Se elige que clases se va a detectar
         allowed_classes = ['car']
 
@@ -191,10 +187,10 @@ def main(_argv):
                 names.append(class_name)
         names = np.array(names)
         count = len(names)
-        # delete detections that are not in allowed_classes
+        # eliminar detecciones que no esten permitidas
         bboxes = np.delete(bboxes, deleted_indx, axis=0)
         scores = np.delete(scores, deleted_indx, axis=0)
-        # encode yolo detections and feed to tracker
+        # yolo + deepsort
         features = encoder(frame, bboxes)
         detections = [Detection(bbox, score, class_name, feature) for bbox, score, class_name, feature in
                       zip(bboxes, scores, names, features)]
@@ -209,18 +205,18 @@ def main(_argv):
         classes = np.array([d.class_name for d in detections])
         indices = preprocessing.non_max_suppression(boxs, classes, nms_max_overlap, scores)
         detections = [detections[i] for i in indices]
-        # Call the tracker
+        # se llama al tracker
         tracker.predict()
+
         tracker.update(detections)
 
-        # update tracks
+        # se actualiza los tracks y se dibujan los cuadros
 
         for track in tracker.tracks:
 
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
             bbox = track.to_tlbr()
-            # print(bbox[-1])
             if bbox[-1] > LIMIT_LINE_OF_DETECTION:
                 track.is_deleted()
                 DETECTION_EVENTS.clear()
@@ -240,7 +236,6 @@ def main(_argv):
         else:
             print("no hay nada")
 
-        # if enable info flag then print details about each track
         # calculate frames per second of running detections
         cv2.line(frame, (0, LIMIT_LINE_OF_DETECTION),
                         (1300, LIMIT_LINE_OF_DETECTION),
@@ -253,7 +248,7 @@ def main(_argv):
         if not FLAGS.dont_show:
             cv2.imshow("Output Video", result)
 
-        # if output flag is set, save video file
+        # salvar video
         if FLAGS.output:
             out.write(result)
         if cv2.waitKey(1) & 0xFF == ord('q'): break
@@ -268,19 +263,15 @@ def main(_argv):
             if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS or max_time >= MAXIMUM_TIME_WAITING_IN_SECONDS:
                 print("HOLA!")
                 max_time = 0
-                # while len(DETECTION_EVENTS) > 0: DETECTION_EVENTS.pop()
-                # show_notification_message("message")
-
+                DETECTION_EVENTS.clear()
                 subprocess.run('python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
                           shell=True)
-            # sleep(30)
 
     cv2.destroyAllWindows()
 
 
 def get_last_number_of_people_detected():
     return DETECTION_EVENTS[-1]['number_of_people_detected']
-
 
 def create_list_of_closest_person_detected():
     list_closest_person_detected = [0, 0]
@@ -289,7 +280,6 @@ def create_list_of_closest_person_detected():
         list_closest_person_detected.append(person_closes)
         max_value = np.max(list_closest_person_detected)
     return max_value
-
 
 def calculate_average_waiting_time_in_seconds():
     datetime_diff_in_seconds = []
