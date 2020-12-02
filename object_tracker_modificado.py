@@ -1,10 +1,10 @@
 import os
 import subprocess
 from datetime import datetime
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import time
+
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -17,10 +17,15 @@ from core.config import cfg
 from PIL import Image
 import cv2
 import numpy as np
+import argparse
+import imutils
 
 import matplotlib.pyplot as plt
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
+#instalar mongo para la base de datos
+import pymongo
+from pymongo import MongoClient
 
 # deep sort imports
 from deep_sort import preprocessing, nn_matching, linear_assignment
@@ -45,11 +50,12 @@ flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
 
 DETECTION_EVENTS = []
-MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 2
+MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 1000000
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
-MAXIMUM_TIME_WAITING_IN_SECONDS = 10
-LIMIT_LINE_OF_DETECTION = 400
-
+MAXIMUM_TIME_WAITING_IN_SECONDS = 1000000
+LIMIT_LINE_OF_DETECTION = 300
+client = MongoClient()
+db = client.neo_database
 
 
 def main(_argv):
@@ -59,6 +65,7 @@ def main(_argv):
     max_cosine_distance = 0.4
     nn_budget = None
     nms_max_overlap = 1.0
+
     t = time.time()
 
     # inilizacion de deep sort
@@ -75,8 +82,8 @@ def main(_argv):
     session = InteractiveSession(config=config)
     STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(FLAGS)
     input_size = FLAGS.size
-    video_path = FLAGS.video
-
+    #video_path = FLAGS.video
+    video_path = 'rtsp://admin:Admin123@172.30.3.71'
     # cargar el modelo tyny
     if FLAGS.framework == 'tflite':
         interpreter = tf.lite.Interpreter(model_path=FLAGS.weights)
@@ -100,7 +107,6 @@ def main(_argv):
 
     # parametro para guardar el video
     if FLAGS.output:
-        # by default VideoCapture returns float instead of int
         width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(vid.get(cv2.CAP_PROP_FPS))
@@ -130,9 +136,8 @@ def main(_argv):
             interpreter.set_tensor(input_details[0]['index'], image_data)
             interpreter.invoke()
             pred = [interpreter.get_tensor(output_details[i]['index']) for i in range(len(output_details))]
-            # run detections using yolov3 if flag is set
             if FLAGS.model == 'yolov3' and FLAGS.tiny == True:
-                boxes, pred_conf = filter_boxes(pred[1], pred[0], score_threshold=0.25,
+                boxes, pred_conf = filter_boxes(pred[1], pred[0], score_threshold=0.1,
                                                 input_shape=tf.constant([input_size, input_size]))
             else:
                 boxes, pred_conf = filter_boxes(pred[0], pred[1], score_threshold=0.25,
@@ -171,9 +176,9 @@ def main(_argv):
         class_names = utils.read_class_names(cfg.YOLO.CLASSES)
 
         # Activar todas las clases
-        # allowed_classes = list(class_names.values())
+        #allowed_classes = list(class_names.values())
         # Se elige que clases se va a detectar
-        allowed_classes = ['car']
+        allowed_classes = ['person']
 
         # se inicia el filtro para separar las clases a detectar
         names = []
@@ -195,11 +200,11 @@ def main(_argv):
         detections = [Detection(bbox, score, class_name, feature) for bbox, score, class_name, feature in
                       zip(bboxes, scores, names, features)]
 
-        # initialize color map
+        # se inicia color map
         cmap = plt.get_cmap('tab20b')
         colors = [cmap(i)[:3] for i in np.linspace(0, 1, 20)]
 
-        # run non-maxima supression
+        # incia non-maxima supression
         boxs = np.array([d.tlwh for d in detections])
         scores = np.array([d.confidence for d in detections])
         classes = np.array([d.class_name for d in detections])
@@ -217,7 +222,7 @@ def main(_argv):
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
             bbox = track.to_tlbr()
-            if bbox[-1] > LIMIT_LINE_OF_DETECTION:
+            if bbox[-1] < LIMIT_LINE_OF_DETECTION:
                 track.is_deleted()
                 DETECTION_EVENTS.clear()
                 continue
@@ -236,10 +241,10 @@ def main(_argv):
         else:
             print("no hay nada")
 
-        # calculate frames per second of running detections
-        cv2.line(frame, (0, LIMIT_LINE_OF_DETECTION),
-                        (1300, LIMIT_LINE_OF_DETECTION),
-                        (255, 0, 0), 4)
+        # calculo de fps
+        cv2.line(frame, (LIMIT_LINE_OF_DETECTION, 0),
+                 (LIMIT_LINE_OF_DETECTION, 1300),
+                 (255, 0, 0), 4)
         fps = 1.0 / (time.time() - start_time)
         print("FPS: %.2f" % fps)
         result = np.asarray(frame)
@@ -263,15 +268,20 @@ def main(_argv):
             if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS or max_time >= MAXIMUM_TIME_WAITING_IN_SECONDS:
                 print("HOLA!")
                 max_time = 0
+                post = {"date": datetime.now()}
+                alarms = db.alarms
+                alarms.insert_one(post)
                 DETECTION_EVENTS.clear()
-                subprocess.run('python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
-                          shell=True)
+                subprocess.run(
+                    'python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
+                    shell=True)
 
     cv2.destroyAllWindows()
 
 
 def get_last_number_of_people_detected():
     return DETECTION_EVENTS[-1]['number_of_people_detected']
+
 
 def create_list_of_closest_person_detected():
     list_closest_person_detected = [0, 0]
@@ -280,6 +290,7 @@ def create_list_of_closest_person_detected():
         list_closest_person_detected.append(person_closes)
         max_value = np.max(list_closest_person_detected)
     return max_value
+
 
 def calculate_average_waiting_time_in_seconds():
     datetime_diff_in_seconds = []
