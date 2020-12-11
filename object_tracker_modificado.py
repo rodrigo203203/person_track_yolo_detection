@@ -83,8 +83,8 @@ def main(_argv):
     session = InteractiveSession(config=config)
     STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(FLAGS)
     input_size = FLAGS.size
-    #video_path = FLAGS.video
-    video_path = 0
+    video_path = FLAGS.video
+    #video_path = 0
     #video_path = 'rtsp://admin:Admin123@172.30.3.71'
     # cargar el modelo tyny
     if FLAGS.framework == 'tflite':
