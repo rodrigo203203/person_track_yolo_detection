@@ -225,9 +225,8 @@ def main(_argv):
             bbox = track.to_tlbr()
             print(bbox)
             print(bbox[0])
-            if bbox[1] > LIMIT_LINE_OF_DETECTION_MIN and bbox[1] < LIMIT_LINE_OF_DETECTION_MAX:
+            if bbox[1] < LIMIT_LINE_OF_DETECTION_MIN or bbox[1] > LIMIT_LINE_OF_DETECTION_MAX:
                 track.is_deleted()
-                DETECTION_EVENTS.clear()
                 continue
             class_name = track.get_class()
             # se empieza a dibujar los cuadros
