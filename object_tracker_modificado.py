@@ -53,7 +53,8 @@ DETECTION_EVENTS = []
 MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 1000000
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
 MAXIMUM_TIME_WAITING_IN_SECONDS = 1000000
-LIMIT_LINE_OF_DETECTION = 300
+LIMIT_LINE_OF_DETECTION_MIN = 350
+LIMIT_LINE_OF_DETECTION_MAX = 1550
 client = MongoClient()
 db = client.neo_database
 
@@ -82,7 +83,8 @@ def main(_argv):
     session = InteractiveSession(config=config)
     STRIDES, ANCHORS, NUM_CLASS, XYSCALE = utils.load_config(FLAGS)
     input_size = FLAGS.size
-    video_path = FLAGS.video
+    #video_path = FLAGS.video
+    video_path = 0
     #video_path = 'rtsp://admin:Admin123@172.30.3.71'
     # cargar el modelo tyny
     if FLAGS.framework == 'tflite':
@@ -218,11 +220,12 @@ def main(_argv):
         # se actualiza los tracks y se dibujan los cuadros
 
         for track in tracker.tracks:
-
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
             bbox = track.to_tlbr()
-            if bbox[-1] < LIMIT_LINE_OF_DETECTION:
+            print(bbox)
+            print(bbox[0])
+            if bbox[1] > LIMIT_LINE_OF_DETECTION_MIN and bbox[1] < LIMIT_LINE_OF_DETECTION_MAX:
                 track.is_deleted()
                 DETECTION_EVENTS.clear()
                 continue
@@ -242,9 +245,12 @@ def main(_argv):
             print("no hay nada")
 
         # calculo de fps
-        cv2.line(frame, (LIMIT_LINE_OF_DETECTION, 0),
-                 (LIMIT_LINE_OF_DETECTION, 1300),
-                 (255, 0, 0), 4)
+        cv2.line(frame, (1400, 0),
+                 (350, 1300),
+                 (255, 0, 0), 2)
+        cv2.line(frame, (1550, 0),
+                 (1900, 1300),
+                 (255, 0, 0), 2)
         fps = 1.0 / (time.time() - start_time)
         print("FPS: %.2f" % fps)
         result = np.asarray(frame)
