@@ -223,9 +223,8 @@ def main(_argv):
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
             bbox = track.to_tlbr()
-            print(bbox)
-            print(bbox[0])
-            if bbox[1] < LIMIT_LINE_OF_DETECTION_MIN or bbox[1] > LIMIT_LINE_OF_DETECTION_MAX:
+            center = ((bbox[1] + bbox[-1])/2)
+            if center < LIMIT_LINE_OF_DETECTION_MIN or center > LIMIT_LINE_OF_DETECTION_MAX:
                 track.is_deleted()
                 continue
             class_name = track.get_class()
