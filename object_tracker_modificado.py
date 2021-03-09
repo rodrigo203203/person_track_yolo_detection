@@ -53,7 +53,7 @@ DETECTION_EVENTS = []
 MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 1000000
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
 MAXIMUM_TIME_WAITING_IN_SECONDS = 1000000
-LIMIT_LINE_OF_DETECTION_MIN = 350
+LIMIT_LINE_OF_DETECTION_MIN = 1550
 LIMIT_LINE_OF_DETECTION_MAX = 1550
 client = MongoClient()
 db = client.neo_database
@@ -101,7 +101,7 @@ def main(_argv):
 
     # comienza la carga del video/camara
     try:
-        vid = cv2.VideoCapture(int(video_path))
+        vid = cv2.VideoCapture(int(0))
     except:
         vid = cv2.VideoCapture(video_path)
 
@@ -225,8 +225,8 @@ def main(_argv):
             bbox = track.to_tlbr()
             center = ((bbox[1] + bbox[-1])/2)
             if center < LIMIT_LINE_OF_DETECTION_MIN or center > LIMIT_LINE_OF_DETECTION_MAX:
-                track.is_deleted()
-                continue
+              track.is_deleted()
+              break
             class_name = track.get_class()
             # se empieza a dibujar los cuadros
             color = colors[int(track.track_id) % len(colors)]
@@ -255,7 +255,7 @@ def main(_argv):
         result = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         if not FLAGS.dont_show:
-            cv2.imshow("Output Video", result)
+            cv2.imshow("NeoVision", result)
 
         # salvar video
         if FLAGS.output:
