@@ -4,6 +4,7 @@ from datetime import datetime
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import time
+import statistics as stat
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 if len(physical_devices) > 0:
@@ -50,13 +51,15 @@ flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
 
 DETECTION_EVENTS = []
-MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 1000000
+MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS = 360
 MAXIMUM_NUMBER_OF_PEOPLE_DETECTED = 0
-MAXIMUM_TIME_WAITING_IN_SECONDS = 1000000
+MAXIMUM_TIME_WAITING_IN_SECONDS = 360
 LIMIT_LINE_OF_DETECTION_MIN = 350
-LIMIT_LINE_OF_DETECTION_MAX = 1550
-client = MongoClient()
-db = client.neo_database
+LIMIT_LINE_OF_DETECTION_MAX = 1650
+LIST_OF_TIME =[]
+#client = MongoClient()
+#db = client.neo_database
+
 
 
 def main(_argv):
@@ -101,7 +104,7 @@ def main(_argv):
 
     # comienza la carga del video/camara
     try:
-        vid = cv2.VideoCapture(int(0))
+        vid = cv2.VideoCapture(video_path)
     except:
         vid = cv2.VideoCapture(video_path)
 
@@ -122,7 +125,15 @@ def main(_argv):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             image = Image.fromarray(frame)
         else:
+            average_time = 0
+            moda_time = 0
+            average_time = sum(LIST_OF_TIME)/len(LIST_OF_TIME)
+            moda_time = stat.mode(LIST_OF_TIME)
             print('Video finalizado o el formato del video no se puede leer')
+            print('Tiempo promedio de espera total=')
+            print(average_time)
+            print('Tiempo más repetido=')
+            print(moda_time)
             break
 
         frame_size = frame.shape[:2]
@@ -178,9 +189,9 @@ def main(_argv):
         class_names = utils.read_class_names(cfg.YOLO.CLASSES)
 
         # Activar todas las clases
-        #allowed_classes = list(class_names.values())
+        allowed_classes = list(class_names.values())
         # Se elige que clases se va a detectar
-        allowed_classes = ['person']
+        #allowed_classes = ['person']
 
         # se inicia el filtro para separar las clases a detectar
         names = []
@@ -224,9 +235,6 @@ def main(_argv):
                 continue
             bbox = track.to_tlbr()
             center = ((bbox[1] + bbox[-1])/2)
-            if center < LIMIT_LINE_OF_DETECTION_MIN or center > LIMIT_LINE_OF_DETECTION_MAX:
-              track.is_deleted()
-              break
             class_name = track.get_class()
             # se empieza a dibujar los cuadros
             color = colors[int(track.track_id) % len(colors)]
@@ -267,18 +275,19 @@ def main(_argv):
             last_number_of_people_detected = get_last_number_of_people_detected()
             average_waiting_time_in_seconds = waiting_time_in_seconds / last_number_of_people_detected
             print("AVG: {}".format(average_waiting_time_in_seconds))
+            LIST_OF_TIME.append(average_waiting_time_in_seconds)
             diff2 = DETECTION_EVENTS[0]["datetime_event"] - datetime.now()
             max_time = abs(diff2.total_seconds())
             if average_waiting_time_in_seconds >= MAXIMUM_AVERAGE_WAITING_TIME_IN_SECONDS or max_time >= MAXIMUM_TIME_WAITING_IN_SECONDS:
                 print("HOLA!")
                 max_time = 0
-                post = {"date": datetime.now()}
-                alarms = db.alarms
-                alarms.insert_one(post)
+                #post = {"date": datetime.now()}
+                #alarms = db.alarms
+                #alarms.insert_one(post)
                 DETECTION_EVENTS.clear()
-                subprocess.run(
-                    'python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
-                    shell=True)
+                #subprocess.run(
+                 #   'python /Users/rodrigomoralesrivas/PycharmProjects/proyecto_tesis/yolov4-deepsort/prueba_deteccion.py',
+                  #  shell=True)
 
     cv2.destroyAllWindows()
 
@@ -309,3 +318,4 @@ if __name__ == '__main__':
         app.run(main)
     except SystemExit:
         pass
+
