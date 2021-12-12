@@ -263,7 +263,7 @@ def main(_argv):
         result = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         if not FLAGS.dont_show:
-            cv2.imshow("NeoVision", result)
+            cv2.imshow("VisionRex", result)
 
         # salvar video
         if FLAGS.output:

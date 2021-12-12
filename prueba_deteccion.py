@@ -15,4 +15,4 @@ def show_notification_message(message):
     popupButton.pack()
     popupRoot.geometry('555x300+700+500')
     popupRoot.mainloop()
-show_notification_message("Se supero el tiempo de espera maximo y se recomienda abrira una nueva caja")
+show_notification_message("Se súpero el tiempo de espera maximo y se recomienda abrir una nueva caja")

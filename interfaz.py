@@ -4,11 +4,14 @@ from PIL import ImageTk, Image
 root = tk.Tk()
 video = ""
 salida = ""
-root.title("NeoVision")
+root.title("VisionRex")
 root.geometry("650x400")
 #"#32afb5"
 root.configure(bg="white")
-img = ImageTk.PhotoImage(Image.open("./data/logo2.jpg"))
+imagen = Image.open("./data/logo-visionrex.png")
+imagen = imagen.resize((200,100))
+#imagen.save("ProyectosconPython_resize.png")
+img = ImageTk.PhotoImage(imagen)
 label1 = tk.Label(root, image=img)
 label1.place(x=240, y=0)
 def start():
